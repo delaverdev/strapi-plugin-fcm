@@ -2,12 +2,7 @@
 
 const { propOr } = require('lodash/fp');
 
-const {
-    getPaginationInfo,
-    convertPagedToStartLimit,
-    shouldCount,
-    transformPaginationResponse,
-} = require('@strapi/utils');
+
 
 const { getFetchParams } = require('@strapi/strapi/lib/core-api/service');
 
@@ -27,26 +22,32 @@ const setPublishedAt = data => {
 const uid = 'plugin::strapi-plugin-fcm.fcm-topic';
 module.exports = ({ strapi }) => ({
     async find(params = {}) {
-
         const fetchParams = getFetchParams(params);
-        const paginationInfo = getPaginationInfo(fetchParams);
+        
+        // Extract pagination parameters
+        const page = parseInt(params.pagination?.page) || 1;
+        const pageSize = parseInt(params.pagination?.pageSize) || 25;
+        const start = (page - 1) * pageSize;
+        const limit = pageSize;
+
         const data = await strapi.entityService.findMany(uid, {
             ...fetchParams,
-            ...convertPagedToStartLimit(paginationInfo),
+            start,
+            limit,
         });
 
-        if (shouldCount(fetchParams)) {
-            const count = await strapi.entityService.count(uid, { ...fetchParams, ...paginationInfo });
-
-            return {
-                data,
-                pagination: transformPaginationResponse(paginationInfo, count),
-            };
-        }
+        // Get total count for pagination
+        const count = await strapi.entityService.count(uid, { ...fetchParams });
+        const pageCount = Math.ceil(count / pageSize);
 
         return {
             data,
-            pagination: paginationInfo,
+            pagination: {
+                page,
+                pageSize,
+                pageCount,
+                total: count,
+            },
         };
     },
 

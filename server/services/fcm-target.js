@@ -1,12 +1,5 @@
 'use strict';
 
-const {
-    getPaginationInfo,
-    convertPagedToStartLimit,
-    shouldCount,
-    transformPaginationResponse,
-} = require('@strapi/utils');
-
 const { getFetchParams } = require('@strapi/strapi/lib/core-api/service');
 
 
@@ -48,13 +41,13 @@ module.exports = ({ strapi }) => {
     return ({
 
     async find(params = {}) {
-
-        const fetchParams = getFetchParams(params);
-        const paginationInfo = getPaginationInfo(fetchParams);
-        const startLimit = convertPagedToStartLimit(paginationInfo);
-        // console.log('startLimit', startLimit, 'paginationInfo', paginationInfo);
-
         const knex = strapi.db.connection;
+
+        // Extract pagination parameters
+        const page = parseInt(params.pagination?.page) || 1;
+        const pageSize = parseInt(params.pagination?.pageSize) || 25;
+        const start = (page - 1) * pageSize;
+        const limit = pageSize;
 
         const configs = (await getConfigurationService().find()).data;
         // console.log('fcm-target configs', configs);
@@ -67,8 +60,8 @@ module.exports = ({ strapi }) => {
             getQuery(devicesTokensCollectionName,
                 deviceTokenFieldName,
                 deviceLabelFieldName,
-                startLimit.start || 0,
-                startLimit.limit || 25)
+                start,
+                limit)
         );
         let rows
         switch (knex.client.config.client) {
@@ -82,21 +75,21 @@ module.exports = ({ strapi }) => {
           }
         }
         // console.log('fcm-target results', rows);
-        if (shouldCount(fetchParams)) {
-            const countResult = await knex.raw(countQuery(devicesTokensCollectionName, deviceTokenFieldName));
-            const count = (countResult.rows || countResult[0])?.[0]?.count;
-            // console.log('fcm-target countResult', count);
-            return {
-                data: rows,
-                pagination: transformPaginationResponse(paginationInfo, Number(count)),
-            };
-        }
+
+        // Get total count for pagination
+        const countResult = await knex.raw(countQuery(devicesTokensCollectionName, deviceTokenFieldName));
+        const count = (countResult.rows || countResult[0])?.[0]?.count || 0;
+        const pageCount = Math.ceil(count / pageSize);
 
         return {
             data: rows,
-            pagination: paginationInfo,
+            pagination: {
+                page,
+                pageSize,
+                pageCount,
+                total: count,
+            },
         };
-
     },
     async count(params = {}) {
         const knex = strapi.db.connection;
