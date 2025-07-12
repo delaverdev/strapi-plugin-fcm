@@ -7,7 +7,7 @@ const {
     convertPagedToStartLimit,
     shouldCount,
     transformPaginationResponse,
-} = require('@strapi/strapi');
+} = require('@strapi/utils');
 
 const { getFetchParams } = require('@strapi/strapi/lib/core-api/service');
 
@@ -56,6 +56,7 @@ module.exports = ({ strapi }) => ({
 
     async create(params = {}) {
         const { data } = params;
+        const contentType = strapi.contentTypes[uid];
 
         if (hasDraftAndPublish(contentType)) {
             setPublishedAt(data);

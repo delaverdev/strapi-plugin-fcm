@@ -5,7 +5,7 @@ const {
     convertPagedToStartLimit,
     shouldCount,
     transformPaginationResponse,
-} = require('@strapi/strapi');
+} = require('@strapi/utils');
 
 const { getFetchParams } = require('@strapi/strapi/lib/core-api/service');
 
@@ -40,11 +40,12 @@ union all
 `;
 };
 
-const getConfigurationService = () => {
-    return strapi.plugin('strapi-plugin-fcm').service('fcm-plugin-configuration');
-}
+module.exports = ({ strapi }) => {
+    const getConfigurationService = () => {
+        return strapi.plugin('strapi-plugin-fcm').service('fcm-plugin-configuration');
+    }
 
-module.exports = ({ strapi }) => ({
+    return ({
 
     async find(params = {}) {
 
@@ -82,7 +83,7 @@ module.exports = ({ strapi }) => ({
         }
         // console.log('fcm-target results', rows);
         if (shouldCount(fetchParams)) {
-            const countResult = await knex.raw(countQuery(devicesTokensCollectionName, deviceTokenFieldName, deviceLabelFieldName));
+            const countResult = await knex.raw(countQuery(devicesTokensCollectionName, deviceTokenFieldName));
             const count = (countResult.rows || countResult[0])?.[0]?.count;
             // console.log('fcm-target countResult', count);
             return {
@@ -97,9 +98,13 @@ module.exports = ({ strapi }) => ({
         };
 
     },
-    count(params = {}) {
+    async count(params = {}) {
         const knex = strapi.db.connection;
-        return knex.raw(countQuery('fcm_tokens', 'token', 'label'));
+        const configs = (await getConfigurationService().find()).data;
+        const devicesTokensCollectionName = configs.devicesTokensCollectionName;
+        const deviceTokenFieldName = configs.deviceTokenFieldName;
+        return knex.raw(countQuery(devicesTokensCollectionName, deviceTokenFieldName));
     },
 
-});
+    });
+};

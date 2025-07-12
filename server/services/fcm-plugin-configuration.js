@@ -13,7 +13,7 @@ const {
     convertPagedToStartLimit,
     shouldCount,
     transformPaginationResponse,
-} = require('@strapi/strapi');
+} = require('@strapi/utils');
 
 const { getFetchParams } = require('@strapi/strapi/lib/core-api/service');
 
