@@ -14,10 +14,11 @@ const getQuery = (
     if (!devicesTokensCollectionName) {
         return `select fcm_topics.name as label, 'topic' as type, fcm_topics.name as value from fcm_topics limit ${limit} offset ${offset}`;
     }
-    return `(select fcm_topics.label as label, 'topic' as type, fcm_topics.name as value from fcm_topics)
-union all
-(select ${devicesTokensCollectionName}.${deviceLabelFieldName} as label, 'token' as type, ${devicesTokensCollectionName}.${deviceTokenFieldName} as value from ${devicesTokensCollectionName} where coalesce(TRIM(${devicesTokensCollectionName}.${deviceTokenFieldName}), '') <> '') limit ${limit} offset ${offset}`;
-
+    return `select * from (
+        select fcm_topics.label as label, 'topic' as type, fcm_topics.name as value from fcm_topics
+        union all
+        select ${devicesTokensCollectionName}.${deviceLabelFieldName} as label, 'token' as type, ${devicesTokensCollectionName}.${deviceTokenFieldName} as value from ${devicesTokensCollectionName} where coalesce(TRIM(${devicesTokensCollectionName}.${deviceTokenFieldName}), '') <> ''
+    ) as combined_targets limit ${limit} offset ${offset}`;
 };
 
 const countQuery = (
@@ -27,10 +28,11 @@ const countQuery = (
     if (!devicesTokensCollectionName) {
         return `select count(*) as count from fcm_topics`;
     }
-    return `select count(*) from ((select fcm_topics.name as value from fcm_topics)
-union all
-(select ${devicesTokensCollectionName}.${deviceTokenFieldName} as value from ${devicesTokensCollectionName} where coalesce(TRIM(${devicesTokensCollectionName}.${deviceTokenFieldName}), '') <> '')) as targets;
-`;
+    return `select count(*) as count from (
+        select fcm_topics.name as value from fcm_topics
+        union all
+        select ${devicesTokensCollectionName}.${deviceTokenFieldName} as value from ${devicesTokensCollectionName} where coalesce(TRIM(${devicesTokensCollectionName}.${deviceTokenFieldName}), '') <> ''
+    ) as targets`;
 };
 
 module.exports = ({ strapi }) => {
@@ -51,6 +53,11 @@ module.exports = ({ strapi }) => {
 
         const configs = (await getConfigurationService().find()).data;
         // console.log('fcm-target configs', configs);
+
+        // Check if configuration exists
+        if (!configs) {
+            throw new Error('FCM plugin configuration not found. Please configure the plugin first.');
+        }
 
         const devicesTokensCollectionName = configs.devicesTokensCollectionName;
         const deviceTokenFieldName = configs.deviceTokenFieldName;
@@ -94,6 +101,12 @@ module.exports = ({ strapi }) => {
     async count(params = {}) {
         const knex = strapi.db.connection;
         const configs = (await getConfigurationService().find()).data;
+        
+        // Check if configuration exists
+        if (!configs) {
+            throw new Error('FCM plugin configuration not found. Please configure the plugin first.');
+        }
+        
         const devicesTokensCollectionName = configs.devicesTokensCollectionName;
         const deviceTokenFieldName = configs.deviceTokenFieldName;
         return knex.raw(countQuery(devicesTokensCollectionName, deviceTokenFieldName));
